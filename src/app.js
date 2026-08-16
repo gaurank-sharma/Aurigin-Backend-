@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { connectDB } from "./db.js";
 import { authRouter } from "./routes/auth.js";
 import { employeesRouter } from "./routes/employees.js";
 import { leaveRouter } from "./routes/leave.js";
@@ -11,6 +12,14 @@ import { announcementsRouter } from "./routes/announcements.js";
 import { requireAuth } from "./middleware/auth.js";
 
 export const app = express();
+
+// Ensures the (cached) DB connection is ready before any route runs — keeps
+// the app self-sufficient no matter which entrypoint invokes it (local
+// server, Vercel function, tests), instead of relying on the caller to
+// connect first.
+app.use((_req, _res, next) => {
+  connectDB().then(() => next(), next);
+});
 
 const allowedOrigins = (process.env.CORS_ORIGIN ?? "").split(",").map((o) => o.trim()).filter(Boolean);
 app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : true }));
@@ -34,3 +43,8 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });
+
+// Express apps are themselves valid (req, res) handlers, so this default
+// export satisfies Vercel's "default export must be a function" requirement
+// directly — no matter which file Vercel actually invokes.
+export default app;
